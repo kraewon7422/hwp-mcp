@@ -15,7 +15,9 @@ The core is two dependency-free, single-file tools written from the HWP 5.0 / HW
 | `hwpx_edit.py` | edit .hwpx without Hangul: replace text, fill form cells, insert paragraphs — formatting kept | **~10–50 ms** |
 
 Everything Hangul itself is needed for (exact page images, editing binary .hwp, creating documents) goes through the
-installed Hangul, which the server keeps warm in the background.
+installed Hangul, which the server keeps warm in the background (one hidden Hangul per PC, ~200 MB, closed after 30 idle
+minutes; other Claude windows reuse the fact that one is warm instead of starting their own — tune with
+`HWP_MCP_KEEP_WARM_MIN` / `HWP_MCP_PREWARM=0`).
 
 ## Why
 

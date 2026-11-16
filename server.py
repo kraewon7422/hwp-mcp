@@ -454,8 +454,10 @@ class HwpWorker:
             try:
                 _, _, fn, box, done = self.q.get(timeout=30)
             except queue.Empty:
-                if self.hwp is not None and time.time() - self.last > KEEP_WARM:
-                    self._quit()
+                if self.hwp is not None:
+                    keep = min(KEEP_WARM, 120) if self.others_warm() else KEEP_WARM
+                    if time.time() - self.last > keep:
+                        self._quit()
                 continue
             if fn == self._quit_job:  # never start Hangul just to close it
                 self._quit()
@@ -512,8 +514,24 @@ class HwpWorker:
             raise box["error"]
         return box["result"]
 
+    @classmethod
+    def others_warm(cls) -> bool:
+        """True if another live hwp-mcp server (another Claude window, or the claude.ai server) already
+        keeps a hidden Hangul. Then this one doesn't pre-start its own and closes any it starts quickly,
+        so there is about one warm Hangul per PC instead of one per window."""
+        me = str(os.getpid())
+        try:
+            lines = cls.PIDFILE.read_text(encoding="ascii", errors="ignore").splitlines()
+        except OSError:
+            return False
+        for line in lines:
+            p = line.split()
+            if len(p) == 4 and p[2] != me and cls._alive(p[0], p[1]) and cls._alive(p[2], p[3]):
+                return True
+        return False
+
     def warm(self):
-        if PREWARM and self.hwp is None and hangul_installed():
+        if PREWARM and self.hwp is None and hangul_installed() and not self.others_warm():
             self.submit(lambda h: None, prio=9)
 
     def shutdown(self):
@@ -627,7 +645,7 @@ def _pdf_for(path: Path) -> Path:
 
 def _prerender(path: Path):
     """Background: render the PDF so a later preview is instant (low priority)."""
-    if PREWARM and hangul_installed():
+    if PREWARM and hangul_installed() and (worker().hwp is not None or not HwpWorker.others_warm()):
         CACHE_DIR.mkdir(exist_ok=True)
         pdf = _pdf_path(path)
         if not pdf.exists() and path.stat().st_size <= MAX_FILE:
