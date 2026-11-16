@@ -35,6 +35,8 @@ if sys.stderr is None:  # pythonw: no console → log file. Must happen BEFORE o
     sys.stdout = sys.stderr = _log
     import faulthandler as _fh
     _fh.enable(_log)
+    _fh.dump_traceback_later(60, exit=False, file=_log)  # startup stuck >60 s → write where (cancelled in main)
+    print(f"--- start pid {os.getpid()}", flush=True)
 
 import hashlib  # noqa: E402
 import html  # noqa: E402
@@ -51,8 +53,11 @@ BASE_DIR = Path(BASE_DIR_STR)
 sys.path.insert(0, BASE_DIR_STR)
 import hwp_fast  # noqa: E402
 import hwpx_edit  # noqa: E402
-# Import on the main thread at startup: a first import of numpy (pulled in by pymupdf)
-# inside a worker thread hangs in stdio mode.
+# pymupdf imports the optional 'pymupdf.layout' add-on when it is installed, which loads an ONNX
+# layout model at import time (seconds to minutes, and it can hang a pythonw/stdio server). We only
+# rasterise PDF pages, so block it: a None entry makes 'import pymupdf.layout' raise ImportError.
+for _opt in ("pymupdf.layout", "pymupdf4llm"):  # pymupdf also auto-imports pymupdf4llm (→ same model)
+    sys.modules.setdefault(_opt, None)
 import pymupdf  # noqa: E402
 
 CACHE_DIR = BASE_DIR / "cache"
@@ -1093,6 +1098,11 @@ def main():
     parser.add_argument("--http", action="store_true", help="serve streamable HTTP (for claude.ai via a tunnel)")
     parser.add_argument("--port", type=int, default=_int("HWP_MCP_PORT", 8772))
     args = parser.parse_args()
+    try:
+        import faulthandler
+        faulthandler.cancel_dump_traceback_later()
+    except Exception:
+        pass
     if args.http:
         from mcp.server.transport_security import TransportSecuritySettings
         if not REMOTE_OPEN and not READONLY:
