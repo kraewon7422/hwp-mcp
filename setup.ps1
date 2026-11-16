@@ -110,9 +110,13 @@ if ($LASTEXITCODE -ne 0) { throw "server failed to load" }
 # ---------------------------------------------------------------- 5. connect
 Step "5/5 Connect to Claude"
 if (-not $SkipClaude -and (Get-Command claude -ErrorAction SilentlyContinue)) {
+    # No '--' and no variadic -e here: Windows PowerShell drops '--' when calling the npm claude.ps1 shim,
+    # and then '-e' swallows the command. (MCP stdio is UTF-8 already, so no env is needed.)
     & claude mcp remove $Name -s user 2>$null | Out-Null
-    & claude mcp add $Name -s user -e PYTHONUTF8=1 -- $py $Server | Out-Null
-    if ($LASTEXITCODE -eq 0) { Ok "Claude Code: added as '$Name' (start a new Claude Code session to use it)" } else { Warn "claude mcp add failed" }
+    & claude mcp add -s user $Name $py $Server 2>&1 | Out-Null
+    & claude mcp get $Name 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { Ok "Claude Code: added as '$Name' (start a new Claude Code session to use it)" }
+    else { Warn "claude mcp add failed — run it yourself:  claude mcp add -s user $Name `"$py`" `"$Server`"" }
 } elseif (-not $SkipClaude) {
     Warn "Claude Code CLI not found — skip. Later: claude mcp add $Name -s user -- `"$py`" `"$Server`""
 }
