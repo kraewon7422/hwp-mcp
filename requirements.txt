@@ -1,0 +1,4 @@
+mcp>=1.20,<2
+pywin32>=306; sys_platform == "win32"
+pymupdf>=1.24
+psutil>=5.9

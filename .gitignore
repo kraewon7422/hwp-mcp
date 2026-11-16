@@ -1,0 +1,17 @@
+# local settings / secrets
+.env
+funnel_path.txt
+*secret*
+# runtime
+server.log
+server.log.old
+cache/
+__pycache__/
+*.pyc
+# Hancom DLL is downloaded by setup.ps1, never committed
+security/
+# local-only notes and backups
+.private/
+CONTINUE.md
+# build output
+dist/
